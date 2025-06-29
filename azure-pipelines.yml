@@ -1,0 +1,110 @@
+# azure-pipelines.yml
+
+trigger:
+- main # Dispara o pipeline sempre que houver um push para a branch 'main'
+
+variables:
+  # Variáveis para o deployment da infraestrutura
+  resourceGroupName: 'rg-iac-web-iis' # Deve ser o mesmo do arm-templates/vm-iis-parameters.json
+  vmName: 'vm-iac-web-iis'             # Deve ser o mesmo do arm-templates/vm-iis-parameters.json
+  location: 'eastus'                 # Deve ser o mesmo do arm-templates/vm-iis-parameters.json
+  vmSku: 'Standard_B1s'              # SKU inicial da VM
+
+pool:
+  vmImage: 'windows-latest' # Usaremos um agente Windows para garantir compatibilidade com scripts PowerShell
+
+steps:
+- task: AzureResourceManagerTemplateDeployment@3
+  displayName: 'Deploy Azure Infrastructure (VM with IIS)'
+  inputs:
+    deploymentScope: 'Subscription' # Ou 'Resource Group' se você gerenciar o grupo de recursos fora do pipeline
+    azureResourceManagerConnection: 'azure-subscription-connection' # Nome da sua conexão de serviço Azure
+    subscriptionId: '$(SubscriptionId)' # Variável do Azure DevOps que contém a ID da assinatura da conexão de serviço
+    resourceGroupName: '$(resourceGroupName)'
+    location: '$(location)'
+    templateLocation: 'Linked artifact'
+    csmFile: 'arm-templates/vm-iis-template.json'
+    csmParametersFile: 'arm-templates/vm-iis-parameters.json'
+    overrideParameters: '-vmSku "$(vmSku)" -adminPassword "$(vmAdminPassword)"' # Passa a senha como override
+    # Observação: 'vmAdminPassword' será uma variável de pipeline segura.
+    deploymentMode: 'Incremental' # Mantém recursos existentes, adiciona ou atualiza novos.
+    # Adicionar o grupo de recursos ao escopo do deployment se ele não existir
+    # createResourceGroup: true # Use se quiser que o pipeline crie o RG
+
+- task: PowerShell@2
+  displayName: 'Get VM Public IP'
+  inputs:
+    targetType: 'inline'
+    script: |
+      $vmName = "$(vmName)"
+      $resourceGroupName = "$(resourceGroupName)"
+      $publicIp = az vm show --resource-group $resourceGroupName --name $vmName --query publicIps --output tsv
+      Write-Host "##vso[task.setvariable variable=vmPublicIp;]$publicIp" # Define uma variável de pipeline
+
+- task: PublishBuildArtifacts@1
+  displayName: 'Publish Website Files'
+  inputs:
+    PathtoPublish: 'src'
+    ArtifactName: 'website-files'
+    publishLocation: 'Container'
+
+- task: AzurePowerShell@5
+  displayName: 'Deploy Website Files to IIS'
+  inputs:
+    azureSubscription: 'azure-subscription-connection' # Nome da sua conexão de serviço Azure
+    ScriptType: 'InlineScript'
+    InlineScript: |
+      # Instala o módulo Az.Accounts se não estiver presente
+      if (-not (Get-Module -ListAvailable -Name Az.Accounts)) {
+          Install-Module -Name Az.Accounts -Force -Scope CurrentUser
+      }
+      Connect-AzAccount -ServicePrincipal -Tenant "$(servicePrincipalTenantId)" -ApplicationId "$(servicePrincipalClientId)" -CertificateThumbprint "$(servicePrincipalKey)" # Use as variáveis do Service Principal
+
+      $vmName = "$(vmName)"
+      $resourceGroupName = "$(resourceGroupName)"
+      $tempPath = "C:\temp_website_deploy" # Caminho temporário na VM
+      $webRoot = "C:\inetpub\wwwroot"
+
+      # Obter o IP Privado da VM para usar com Invoke-AzVMRunCommand (mais seguro que IP público)
+      $privateIp = (Get-AzVM -ResourceGroupName $resourceGroupName -Name $vmName).NetworkProfile.NetworkInterfaces.Id |
+                    Get-AzNetworkInterface |
+                    Select-Object -ExpandProperty IpConfigurations |
+                    Select-Object -ExpandProperty PrivateIpAddress
+
+      Write-Host "Conectando via Invoke-AzVMRunCommand no IP: $privateIp"
+
+      # Cria um diretório temporário na VM para fazer upload
+      Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName $vmName -CommandId 'RunPowerShellScript' -ScriptBlock "New-Item -Path '$tempPath' -ItemType Directory -Force" | Out-Null
+
+      # Copia os arquivos do artefato para a VM (o artefato é automaticamente baixado pelo agente)
+      # Assume que 'website-files' é o nome do artefato publicado e contém a pasta 'src'
+      # e que 'src' contém 'index.html'
+      # Isso requer que o agente do Azure DevOps tenha acesso ao diretório do artefato.
+      # Para o agente self-hosted, o artefato estaria no diretório de trabalho.
+      # Para agentes hospedados pela Microsoft, o artefato é baixado para o diretório de trabalho.
+      # O ideal é usar o Copy Files Over SSH ou Windows Machine File Copy task para transferir.
+      # Para simplificar aqui, vou simular o upload copiando do agente para a VM.
+      # No entanto, a tarefa 'Windows Machine File Copy' seria a mais indicada para isso.
+      # Vou usar uma solução alternativa com 'az vm file upload' dentro do PowerShell do pipeline,
+      # mas o ideal seria usar a task 'AzureFileCopy' ou similar.
+
+      Write-Host "Copiando arquivos para a VM..."
+      # Usando AZ CLI para copiar o arquivo HTML.
+      # ATENÇÃO: Para ambientes de produção, considere usar AzureFileCopy task ou Robocopy via Run Command.
+      az vm file upload --resource-group $resourceGroupName --vm-name $vmName --source "$(Agent.BuildDirectory)\website-files\index.html" --destination "C:\inetpub\wwwroot\index.html"
+
+      # Limpa o diretório wwwroot e copia o novo index.html
+      Invoke-AzVMRunCommand -ResourceGroupName $resourceGroupName -VMName $vmName -CommandId 'RunPowerShellScript' -ScriptBlock "Remove-Item -Path '$webRoot\*' -Include * -Recurse -Force; Copy-Item -Path '$tempPath\*' -Destination '$webRoot' -Recurse -Force" | Out-Null
+
+      Write-Host "Website files deployed successfully!"
+
+- task: AzureCLI@2
+  displayName: 'Update VM SKU (Optional - Example)'
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main')) # Executa apenas no sucesso e na branch main
+  inputs:
+    azureSubscription: 'azure-subscription-connection'
+    scriptType: 'bash' # Ou 'powershell' se preferir
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      az vm resize --resource-group $(resourceGroupName) --name $(vmName) --size Standard_B2s --output none
+      echo "VM SKU updated to Standard_B2s."
