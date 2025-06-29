@@ -18,7 +18,7 @@ steps:
   displayName: 'Deploy Azure Infrastructure (VM with IIS)'
   inputs:
     deploymentScope: 'Subscription' # Ou 'Resource Group' se você gerenciar o grupo de recursos fora do pipeline
-    azureResourceManagerConnection: 'azure-subscription-connection' # Nome da sua conexão de serviço Azure
+    azureResourceManagerConnection: 'ARMPipelineConnection' # Nome da sua conexão de serviço Azure
     subscriptionId: '$(SubscriptionId)' # Variável do Azure DevOps que contém a ID da assinatura da conexão de serviço
     resourceGroupName: '$(resourceGroupName)'
     location: '$(location)'
