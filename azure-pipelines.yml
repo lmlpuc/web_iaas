@@ -25,7 +25,6 @@ steps:
     location: '$(location)'
     templateLocation: 'URL of the file'
     csmFile: 'https://raw.githubusercontent.com/lmlpuc/web_iaas/refs/heads/master/arm-templates/vm-iis-template.json'
-    csmParametersFile: 'https://raw.githubusercontent.com/lmlpuc/web_iaas/refs/heads/master/arm-templates/vm-iis-parameters.json'
     overrideParameters: '-vmSku "$(vmSku)" -adminPassword "$(vmAdminPassword)"' # Passa a senha como override
     # Observação: 'vmAdminPassword' será uma variável de pipeline segura.
     deploymentMode: 'Incremental' # Mantém recursos existentes, adiciona ou atualiza novos.
