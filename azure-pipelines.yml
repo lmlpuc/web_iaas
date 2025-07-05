@@ -7,8 +7,8 @@ variables:
   # Variáveis para o deployment da infraestrutura
   resourceGroupName: 'rg-iac-web-iis' # Deve ser o mesmo do arm-templates/vm-iis-parameters.json
   vmName: 'vm-iac-web-iis'             # Deve ser o mesmo do arm-templates/vm-iis-parameters.json
-  location: 'eastus'                 # Deve ser o mesmo do arm-templates/vm-iis-parameters.json
-  vmSku: 'Standard_B1s'              # SKU inicial da VM
+  location: 'westus3'                 # Deve ser o mesmo do arm-templates/vm-iis-parameters.json
+  vmSku: 'Standard_B2ms'              # SKU inicial da VM
 
 pool:
   vmImage: 'windows-latest' # Usaremos um agente Windows para garantir compatibilidade com scripts PowerShell
