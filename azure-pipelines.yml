@@ -18,7 +18,7 @@ steps:
   displayName: 'Deploy Azure Infrastructure (VM with IIS)'
   inputs:
     deploymentScope: 'Resource Group' # Ou 'Resource Group' se você gerenciar o grupo de recursos fora do pipeline
-    azureResourceManagerConnection: 'ARMPipeline-conn' # Nome da sua conexão de serviço Azure
+    azureResourceManagerConnection: 'ar01com' # Nome da sua conexão de serviço Azure
     subscriptionId: '75b542e1-4e29-46e3-84e4-a024586c6e4a' # Variável do Azure DevOps que contém a ID da assinatura da conexão de serviço
     action: 'Create Or Update Resource Group'
     resourceGroupName: 'rg-iac-web-iis'
@@ -51,7 +51,7 @@ steps:
 - task: AzurePowerShell@5
   displayName: 'Deploy Website Files to IIS'
   inputs:
-    azureSubscription: 'ARMPipeline-conn' # Nome da sua conexão de serviço Azure
+    azureSubscription: 'ar01com' # Nome da sua conexão de serviço Azure
     ScriptType: 'InlineScript'
     InlineScript: |
       # Instala o módulo Az.Accounts se não estiver presente
