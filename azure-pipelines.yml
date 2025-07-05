@@ -25,11 +25,12 @@ steps:
     location: '$(location)'
     templateLocation: 'URL of the file'
     csmFile: 'https://raw.githubusercontent.com/lmlpuc/web_iaas/refs/heads/master/arm-templates/vm-iis-template.json'
-    overrideParameters: '-vmSku "$(vmSku)" -adminPassword "$(vmAdminPassword)"' # Passa a senha como override
+    overrideParameters: '-vmSku "$(vmSku)" -adminPassword "$(vmAdminPassword)" -projectName iac02' # Passa a senha como override
     # Observação: 'vmAdminPassword' será uma variável de pipeline segura.
     deploymentMode: 'Incremental' # Mantém recursos existentes, adiciona ou atualiza novos.
     # Adicionar o grupo de recursos ao escopo do deployment se ele não existir
     # createResourceGroup: true # Use se quiser que o pipeline crie o RG
+    deploymentName: 'DeployPipelineTemplate'
 
 - task: PowerShell@2
   displayName: 'Get VM Public IP'
