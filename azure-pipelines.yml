@@ -103,7 +103,7 @@ steps:
   displayName: 'Update VM SKU (Optional - Example)'
   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main')) # Executa apenas no sucesso e na branch main
   inputs:
-    azureSubscription: 'ARMPipeline-conn'
+    azureSubscription: 'ar01com'
     scriptType: 'bash' # Ou 'powershell' se preferir
     scriptLocation: 'inlineScript'
     inlineScript: |
